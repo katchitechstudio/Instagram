@@ -7,3 +7,4 @@ groq
 pytz
 APScheduler
 gunicorn
+Pillow
