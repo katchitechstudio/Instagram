@@ -27,10 +27,25 @@ def health_check():
 
 def init_instagram():
     try:
+        # 1. Önce yüklü olan session.json dosyasını kontrol et
+        if os.path.exists("session.json"):
+            logger.info("Session dosyası bulundu, yükleniyor...")
+            cl.load_settings("session.json")
+            
+            try:
+                # Oturumun geçerliliğini test et
+                cl.get_timeline_feed() 
+                logger.info("Mevcut oturum geçerli.")
+                return
+            except Exception:
+                logger.warning("Session geçersizleşmiş, yeniden giriş denenecek.")
+
+        # 2. Session yoksa veya geçersizse login ol
         if not cl.user_id:
             logger.info("Instagram girişi yapılıyor...")
             cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
-            logger.info("Instagram girişi başarılı!")
+            cl.dump_settings("session.json")
+            logger.info("Instagram girişi başarılı ve yeni session kaydedildi!")
     except Exception as e:
         logger.error(f"Instagram giriş hatası: {e}")
 
@@ -70,10 +85,11 @@ def generate_ai_caption(title, description):
         prompt = f"Şu haberi etkileyici bir Instagram gönderisi haline getir:\nBaşlık: {title}\nDetay: {description}\nKısa, çarpıcı ve emojili olsun."
         chat_completion = groq_client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-70b-versatile",
+            model="llama3-70b-8192", # Hatalı model ismi güncellendi
         )
         return chat_completion.choices[0].message.content
-    except Exception:
+    except Exception as e:
+        logger.error(f"Groq API hatası: {e}")
         return f"{title}\n\nDetaylar için takipte kalın! #haber"
 
 def job():
@@ -85,6 +101,7 @@ def job():
         if image_path:
             caption = generate_ai_caption(news['title'], news.get('description', ''))
             try:
+                # Paylaşım öncesi oturum kontrolü
                 cl.photo_upload(image_path, caption)
                 logger.info("Instagram paylaşımı başarıyla yapıldı!")
             except Exception as e:
