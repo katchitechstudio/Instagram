@@ -56,32 +56,46 @@ def truncate_text(text, max_length=400):
     if not text or len(text) <= max_length: return text
     return text[:max_length].rsplit(" ", 1)[0] + "..."
 
-# --- INSTAGRAM GİRİŞ (HATA GİDERİLDİ) ---
+# --- INSTAGRAM GİRİŞ (DÜZELTİLMİŞ) ---
 def init_instagram():
     global instagram_status
     try:
         cl.set_device(DEVICE_SETTINGS)
+        
         if SESSION_DATA:
             logger.info("SESSION_DATA kullanılarak oturum açılıyor...")
-            # Oturumu ayarlar (settings) olarak yükle
-            session_settings = json.loads(SESSION_DATA)
-            cl.set_settings(session_settings)
-            
-            # Oturumun gerçekten çalışıp çalışmadığını küçük bir istekle test et
             try:
+                # SESSION_DATA'yı dictionary olarak yükle
+                session_settings = json.loads(SESSION_DATA)
+                
+                # load_settings() kullanarak oturumu yükle
+                cl.load_settings(session_settings)
+                
+                # Oturumu test et
                 cl.get_timeline_feed()
                 instagram_status = "Bağlı (Oturum Onaylı) ✅"
                 logger.info("Instagram oturumu başarıyla doğrulandı.")
+                return
+                
             except Exception as session_err:
-                logger.warning(f"Oturum geçersiz, normal giriş deneniyor: {session_err}")
-                cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
-                instagram_status = "Bağlı ✅"
-        else:
-            cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
-            instagram_status = "Bağlı ✅"
+                logger.warning(f"Oturum geçersiz veya hatalı: {session_err}")
+                logger.info("Normal kullanıcı adı/şifre ile giriş yapılıyor...")
+        
+        # Normal giriş yap
+        cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+        instagram_status = "Bağlı (Yeni Giriş) ✅"
+        logger.info("Instagram'a başarıyla giriş yapıldı.")
+        
+        # Yeni oturum verilerini kaydet (konsola yazdır)
+        new_session = cl.get_settings()
+        logger.info("=" * 60)
+        logger.info("YENİ SESSION_DATA (Render'a kaydedin):")
+        logger.info(json.dumps(new_session))
+        logger.info("=" * 60)
+        
     except Exception as e:
-        instagram_status = f"Giriş Hatası: {str(e)[:50]} ❌"
-        logger.error(f"Instagram Login Hatası: {e}")
+        instagram_status = f"Giriş Hatası: {str(e)[:100]} ❌"
+        logger.error(f"Instagram Login Hatası: {e}", exc_info=True)
 
 # --- HABER ÇEKME ---
 def get_latest_news():
