@@ -27,22 +27,23 @@ INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
 INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
 NEWSDATA_API_KEY = os.getenv("NEWS_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-SECRET_KEY = os.getenv("SECRET_KEY", "benim_ozel_sifrem_123") # Render'dan ayarlamayı unutma!
+SECRET_KEY = os.getenv("SECRET_KEY", "instagram-secret-2025")
+SESSION_DATA = os.getenv("SESSION_DATA")
 
 cl = Client()
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# Sabit Cihaz Bilgisi (Instagram Banını Önlemek İçin Şart)
+# Sabit Cihaz Bilgisi (Senin Session verilerinle uyumlu)
 DEVICE_SETTINGS = {
     "app_version": "269.0.0.18.75",
-    "android_version": 30,
-    "android_release": "11.0",
-    "dpi": "440dpi",
-    "resolution": "1080x2340",
-    "manufacturer": "OnePlus",
-    "device": "6T",
-    "model": "ONEPLUS A6010",
-    "cpu": "qcom"
+    "android_version": 29,
+    "android_release": "10.0",
+    "dpi": "480dpi",
+    "resolution": "1080x1920",
+    "manufacturer": "Samsung",
+    "device": "SM-G973F",
+    "model": "Galaxy S10 Plus",
+    "cpu": "exynos9820"
 }
 
 def remove_html_tags(text):
@@ -55,14 +56,20 @@ def truncate_text(text, max_length=400):
     if not text or len(text) <= max_length: return text
     return text[:max_length].rsplit(" ", 1)[0] + "..."
 
-# --- INSTAGRAM GİRİŞ ---
+# --- INSTAGRAM GİRİŞ (Düzeltilmiş Kesin Çözüm) ---
 def init_instagram():
     global instagram_status
     try:
         cl.set_device(DEVICE_SETTINGS)
-        logger.info("Instagram'a giriş yapılıyor...")
-        cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
-        instagram_status = "Bağlı ✅"
+        # SESSION_DATA varsa kod sormadan direkt giriş yapar
+        if SESSION_DATA:
+            logger.info("SESSION_DATA kullanılarak oturum açılıyor...")
+            cl.set_settings(json.loads(SESSION_DATA))
+            instagram_status = "Bağlı (Oturum Onaylı) ✅"
+        else:
+            logger.warning("SESSION_DATA bulunamadı, normal giriş deneniyor...")
+            cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+            instagram_status = "Bağlı ✅"
     except Exception as e:
         instagram_status = f"Giriş Hatası: {str(e)[:50]} ❌"
         logger.error(f"Instagram Login Hatası: {e}")
@@ -74,7 +81,6 @@ def get_latest_news():
         response = requests.get(url, timeout=15)
         data = response.json()
         if data.get("status") == "success" and data.get("results"):
-            # Görseli olan ilk haberi bul
             for news in data["results"]:
                 if news.get("image_url"):
                     return news
@@ -93,7 +99,7 @@ def create_instagram_post(news_item):
             f.write(r.content)
         
         img = Image.open(img_path).convert("RGB")
-        img = img.resize((1080, 1350)) # Instagram Portrait Mode
+        img = img.resize((1080, 1350)) 
         
         if os.path.exists("logo.png"):
             logo = Image.open("logo.png").convert("RGBA")
@@ -160,7 +166,7 @@ def home():
             <p><strong>Durum:</strong> {instagram_status}</p>
             <p><strong>Son İşlem:</strong> {last_update}</p>
             <hr>
-            <p>Tetikleme Linkini Telefonuna Kaydet!</p>
+            <p><a href="/run?key={SECRET_KEY}">HABER PAYLAŞIMINI ŞİMDİ TETİKLE</a></p>
         </body>
     </html>
     """
@@ -171,12 +177,10 @@ def manual_run():
     if key != SECRET_KEY:
         return "Hatalı Şifre!", 403
     
-    # Render'da request süresi dolmadan işi başlatmak için Thread kullanıyoruz
     thread = threading.Thread(target=job)
     thread.start()
-    return "Bot uyanıyor, haber paylaşım işlemi başlatıldı... 1 dakika içinde kontrol edin.", 200
+    return "Bot uyanıyor, haber paylaşım işlemi başlatıldı... 1 dakika içinde Instagram'ı kontrol edin.", 200
 
 if __name__ == "__main__":
-    # Render PORT ayarı
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
