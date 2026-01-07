@@ -56,7 +56,7 @@ def truncate_text(text, max_length=400):
     if not text or len(text) <= max_length: return text
     return text[:max_length].rsplit(" ", 1)[0] + "..."
 
-# --- INSTAGRAM GİRİŞ (DÜZELTİLMİŞ) ---
+# --- INSTAGRAM GİRİŞ (2FA DESTEKLİ) ---
 def init_instagram():
     global instagram_status
     try:
@@ -81,8 +81,16 @@ def init_instagram():
                 logger.warning(f"Oturum geçersiz veya hatalı: {session_err}")
                 logger.info("Normal kullanıcı adı/şifre ile giriş yapılıyor...")
         
-        # Normal giriş yap
-        cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+        # 2FA kontrolü - environment variable'dan kod al
+        verification_code = os.getenv("VERIFICATION_CODE", "").strip()
+        
+        if verification_code:
+            logger.info("2FA kodu environment variable'dan alındı, giriş yapılıyor...")
+            cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD, verification_code=verification_code)
+        else:
+            logger.info("Normal giriş deneniyor...")
+            cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+        
         instagram_status = "Bağlı (Yeni Giriş) ✅"
         logger.info("Instagram'a başarıyla giriş yapıldı.")
         
@@ -96,6 +104,16 @@ def init_instagram():
     except Exception as e:
         instagram_status = f"Giriş Hatası: {str(e)[:100]} ❌"
         logger.error(f"Instagram Login Hatası: {e}", exc_info=True)
+        
+        # 2FA hatası için özel mesaj
+        if "Two-factor authentication required" in str(e):
+            logger.error("=" * 60)
+            logger.error("2FA GEREKLİ! Şu adımları izleyin:")
+            logger.error("1. Instagram'dan gelen SMS/Email kodunu alın")
+            logger.error("2. Render'da VERIFICATION_CODE environment variable'ı ekleyin")
+            logger.error("3. Değer olarak 6 haneli kodu girin")
+            logger.error("4. Servisi yeniden başlatın")
+            logger.error("=" * 60)
 
 # --- HABER ÇEKME ---
 def get_latest_news():
